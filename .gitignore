@@ -1,0 +1,46 @@
+# ---- Secrets & credentials (never commit) ----
+.env
+.env.*
+*.pem
+*.key
+credentials.json
+secrets.*
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ---- Virtual environments ----
+venv/
+.venv/
+env/
+ENV/
+
+# ---- Runtime artifacts (ledgers, breaker state, reports) ----
+reports/
+*.csv
+*.log
+log_*.csv
+state_*.json
+circuit_breaker.json
+trade_ledger.csv
+
+# ---- OS / editor ----
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+
+# ---- Documents (never publish) ----
+*.pdf
+*.docx
