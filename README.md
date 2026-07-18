@@ -137,6 +137,13 @@ talks to a real broker.
 - **No hosted dashboard, no held credentials.** Nothing here talks to the
   network. Your API keys, your account, your machine.
 
+## Secrets
+
+AgentRails itself never touches the network and holds no credentials. When you
+wire it to a broker or a notifier (Telegram, etc.), keep those keys in
+environment variables or a local `.env` file — never in code or in the repo.
+`.env` is gitignored; copy `.env.example` to `.env` and fill in your own values.
+
 ## Legal
 
 This is developer tooling for people automating their **own** brokerage
