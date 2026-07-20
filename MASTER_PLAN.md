@@ -25,10 +25,11 @@ referencia, no como el producto.
 
 ## Estado actual (2026-07-18)
 
-Fases 0 a 5 **completadas**. El núcleo genérico existe, tiene tres adaptadores de
+Fases 0 a 6 **completadas**. El núcleo genérico existe, tiene tres adaptadores de
 dominios muy distintos (finanzas / gasto de API / sistemas), el
-gateway/ledger/breaker ya son genéricos y el README vende la capa general, no un
-bot.
+gateway/ledger/breaker ya son genéricos, las políticas son declarativas (JSON/
+YAML) con integración de una línea (`@guarded`), y el README vende la capa
+general, no un bot.
 
 | Fase | Estado | Qué quedó entregado |
 |---|---|---|
@@ -38,9 +39,10 @@ bot.
 | 3 — Documentación y posicionamiento | ✅ | README reorientado a "capa de seguridad para agentes" con trading y api_spend como ejemplos; guía "escribe tu propio adaptador" (~30 líneas). |
 | 4 — Des-tradingizar el núcleo transversal | ✅ | Gateway MCP con herramienta genérica `evaluate_actions`; `Ledger` con esquema `target`/`action_type`/`cost` (`record_action`); `CircuitBreaker` con `record_failure`/`record_success`/`update_value`. Los nombres de trading (`record`, `record_trade_result`, `update_equity`) quedan como alias del adaptador. |
 | 5 — Tercer adaptador: ejecución de comandos/shell | ✅ | `adapters.shell` completo: `CommandRequest`/`CommandPlan`/`ShellPolicy` + `validate_commands`. Estrena `reversible=False` (bloquea `rm -rf`, `git push --force`, `DROP TABLE`, fork bombs) y añade un guard de operadores de shell (`;`, `\|`, `` ` ``, `$( )`). Ejemplo + 19 tests. |
+| 6 — Políticas declarativas + integración ergonómica | ✅ | `config.py`: `load_policy`/`save_policy`/`policy_from_dict` (JSON en stdlib, YAML opcional vía `[yaml]`, falla cerrado ante claves desconocidas). `guard.py`: `Guard` + decorador `@guarded` (breaker → validación → ledger → ejecutar). Ejemplo ejecutable + 19 tests. |
 
-**105 tests en verde.** Tres dominios (finanzas / gasto de API / sistemas) hacen
-la generalidad demostrable, no teórica.
+**124 tests en verde.** Cargar la política es declarativo y envolver una tool es
+una línea.
 
 ---
 
@@ -69,22 +71,10 @@ allowlist de *modelos* en api_spend).
 
 ## Lo que sigue
 
-Con el frente (A) —núcleo transversal genérico— y los tres adaptadores ya
-cerrados, lo que queda es puramente adopción (B): políticas declarativas y
-publicación.
+Con el núcleo, los tres adaptadores y la ergonomía de adopción ya cerrados, solo
+queda **publicar**.
 
-### Fase 6 — Políticas declarativas + integración ergonómica *(siguiente)*
-
-Bajar la fricción de adopción de "escribir Python" a "editar config" y "una
-línea".
-
-- Cargar `Policy` y configs de adaptador desde **YAML/JSON** ("revisado como
-  código", versionable, diff-able). El valor de "config en un solo sitio" ya es
-  un principio del proyecto; falta hacerla declarativa.
-- Un decorador / context manager `@guarded(policy, ledger=…, breaker=…)` que
-  envuelva una tool para que validación + ledger + breaker ocurran solos.
-
-### Fase 7 — Publicar: empaquetado, CI, reporting y postura de seguridad
+### Fase 7 — Publicar: empaquetado, CI, reporting y postura de seguridad *(siguiente)*
 
 Para una herramienta pública MIT que se vende como *seguridad*, esto es lo mínimo
 creíble.
@@ -114,11 +104,10 @@ creíble.
 
 ## Siguiente acción inmediata
 
-Con los tres adaptadores cerrados, arrancar la **Fase 6**: hacer las políticas
-**declarativas** (cargar `Policy` y config de adaptador desde YAML/JSON, revisable
-como código) y un decorador `@guarded(policy, ledger=…, breaker=…)` que envuelva
-una tool para que validación + ledger + breaker ocurran solos. Es la palanca de
-adopción antes de publicar (Fase 7).
+Con la ergonomía de adopción cerrada (Fase 6), arrancar la **Fase 7**: publicar.
+Lo mínimo creíble para una herramienta pública de *seguridad* — CI en GitHub
+Actions (3.10–3.12), `SECURITY.md` honesto sobre el límite de confianza, un CLI
+`agentrails report` sobre el ledger, y el release a PyPI.
 
 > Herramienta para automatizar acciones propias con credenciales propias. No es
 > consejo de inversión ni de ningún tipo. AgentRails hace cumplir los límites que

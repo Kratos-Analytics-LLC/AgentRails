@@ -22,6 +22,8 @@ from .core import (
     PolicyError,
     validate_actions,
 )
+from .config import load_policy, policy_from_dict, policy_to_dict, save_policy
+from .guard import CircuitBreakerTripped, Guard, guarded
 
 __version__ = "0.1.0"
 
@@ -46,4 +48,13 @@ __all__ = [
     "PolicyContext",
     "PolicyError",
     "validate_actions",
+    # Declarative policies (JSON/YAML)
+    "policy_from_dict",
+    "policy_to_dict",
+    "load_policy",
+    "save_policy",
+    # Ergonomic integration
+    "Guard",
+    "guarded",
+    "CircuitBreakerTripped",
 ]

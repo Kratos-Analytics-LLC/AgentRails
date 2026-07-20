@@ -183,8 +183,51 @@ def policy_to_core(p: EmailPolicy) -> Policy:
 ```
 
 That `cost = len(recipients)` line is the whole point: "cost" is any axis your
-policy limits, not just dollars. The two shipped adapters are worked examples of
-this exact recipe.
+policy limits, not just dollars. The three shipped adapters are worked examples
+of this exact recipe.
+
+## Declarative policies
+
+Keep the rules in a config file, reviewed like code and diffable, instead of
+buried in Python. JSON works out of the box; YAML needs `pip install
+agentrails[yaml]`, so the library stays dependency-free by default.
+
+```python
+from agentrails import load_policy, validate_actions
+
+policy = load_policy("policy.json")   # or policy.yaml / policy.yml
+validate_actions(plan, policy)
+```
+
+```json
+{ "scope_id": "research-agent", "allowed_targets": ["anthropic", "openai"],
+  "dry_run": false, "max_cost": 1.0, "budget": 5.0, "human_approval_threshold": 2.0 }
+```
+
+Loading **fails closed on typos**: an unknown key (`budjet`, `max_costt`) raises
+rather than being silently ignored, so a misspelled limit can't quietly leave you
+unprotected. `save_policy` / `policy_to_dict` do the reverse (sets serialize as
+sorted lists for stable diffs).
+
+## One-line integration
+
+`@guarded` wraps your executor so the whole pass — circuit breaker → policy
+validation → audit ledger → execute — happens on every call, with the body only
+running if the plan is allowed:
+
+```python
+from agentrails import guarded, load_policy, Ledger, CircuitBreaker
+
+@guarded(load_policy("policy.json"), ledger=Ledger("audit.csv"), breaker=CircuitBreaker("cb.json"))
+def call_apis(plan):
+    ...  # only runs if the plan passes; skipped entirely in dry-run
+
+call_apis(plan)   # raises PolicyError / CircuitBreakerTripped instead of acting
+```
+
+Prefer to stay explicit? `Guard(policy, ledger=…, breaker=…)` exposes
+`authorize(plan)` (raise-or-pass) and `run(plan, execute)` (the full flow) as
+plain methods. See `examples/guarded_tool_example.py` — it's runnable as-is.
 
 ## Optional MCP gateway
 
@@ -242,6 +285,7 @@ it.
 
 v0.1 — the generic core (allowlist, size and budget limits, human-approval
 threshold, concentration, irreversibility, shadow mode), the ledger, the circuit
-breaker, a reference MCP gateway, and three reference adapters (**trading**,
-**api_spend**, **shell**) are implemented and tested (105 passing tests). No
-published package yet. Built and maintained by Kratos Analytics LLC.
+breaker, declarative policies (JSON/YAML), the `@guarded` wrapper, a reference
+MCP gateway, and three reference adapters (**trading**, **api_spend**, **shell**)
+are implemented and tested (124 passing tests). No published package yet. Built
+and maintained by Kratos Analytics LLC.

@@ -17,7 +17,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Literal
 
-Status = Literal["dry_run", "placed", "filled", "rejected", "skipped"]
+Status = Literal["dry_run", "placed", "filled", "rejected", "skipped", "failed"]
 
 _FIELDS = [
     "timestamp", "scope_id", "run_label", "target", "action_type",
