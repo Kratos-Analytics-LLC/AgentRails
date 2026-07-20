@@ -16,99 +16,87 @@ contenido, escribir en una base de datos. Hoy más gente cablea agentes (Claude 
 otros) directamente a herramientas que ejecutan acciones irreversibles, y casi
 nadie pone una capa entre "el agente decidió" y "la acción ocurrió".
 
-**Ese hueco es AgentRails.** El objetivo del proyecto deja de ser "otro bot de
-trading" (eso ya existe en otro lado) y pasa a ser **la capa de seguridad y
-gobernanza que cualquier agente enchufa antes de actuar** — con el trading como
-el primer adaptador de referencia, no como el producto.
+**Ese hueco es AgentRails.** El objetivo no es "otro bot de trading" (eso ya
+existe en otro lado) sino **la capa de seguridad y gobernanza que cualquier
+agente enchufa antes de actuar** — con el trading como el primer adaptador de
+referencia, no como el producto.
+
+---
+
+## Estado actual (2026-07-18)
+
+Fases 0 a 5 **completadas**. El núcleo genérico existe, tiene tres adaptadores de
+dominios muy distintos (finanzas / gasto de API / sistemas), el
+gateway/ledger/breaker ya son genéricos y el README vende la capa general, no un
+bot.
+
+| Fase | Estado | Qué quedó entregado |
+|---|---|---|
+| 0 — Endurecer lo existente | ✅ | Tests de guardrails; Ledger+CircuitBreaker cableados en el gateway MCP; secretos en `.env`/entorno. |
+| 1 — Extraer el núcleo genérico | ✅ | `agentrails.core` (`Action`, `ActionPlan`, `Policy`, `PolicyContext`, `validate_actions`) + adaptador `adapters.trading`. API de trading intacta. |
+| 2 — Segundo adaptador no financiero | ✅ | `adapters.api_spend` (gasto de API) completo: modelo + política + validación + ejemplo + 17 tests. |
+| 3 — Documentación y posicionamiento | ✅ | README reorientado a "capa de seguridad para agentes" con trading y api_spend como ejemplos; guía "escribe tu propio adaptador" (~30 líneas). |
+| 4 — Des-tradingizar el núcleo transversal | ✅ | Gateway MCP con herramienta genérica `evaluate_actions`; `Ledger` con esquema `target`/`action_type`/`cost` (`record_action`); `CircuitBreaker` con `record_failure`/`record_success`/`update_value`. Los nombres de trading (`record`, `record_trade_result`, `update_equity`) quedan como alias del adaptador. |
+| 5 — Tercer adaptador: ejecución de comandos/shell | ✅ | `adapters.shell` completo: `CommandRequest`/`CommandPlan`/`ShellPolicy` + `validate_commands`. Estrena `reversible=False` (bloquea `rm -rf`, `git push --force`, `DROP TABLE`, fork bombs) y añade un guard de operadores de shell (`;`, `\|`, `` ` ``, `$( )`). Ejemplo + 19 tests. |
+
+**105 tests en verde.** Tres dominios (finanzas / gasto de API / sistemas) hacen
+la generalidad demostrable, no teórica.
 
 ---
 
 ## El núcleo genérico
 
-Las tres piezas actuales ya son, en el fondo, genéricas; solo tienen nombres de
-trading. La generalización es sobre todo de nombres y de un adaptador:
+Las primitivas quedaron probadas por dos adaptadores. Esta es la traducción que
+demuestra que la idea generaliza:
 
-| Hoy (específico de trading) | Núcleo genérico |
-|---|---|
-| `PlannedOrder` (symbol, side, dollar_amount) | `Action` (tipo, objetivo, magnitud/coste, reversible?) |
-| `TradePlan` (lista de órdenes) | `ActionPlan` (lote de acciones propuestas) |
-| `GuardrailConfig` (allowed_symbols, max_order_usd…) | `Policy` (reglas declarativas) |
-| `validate_plan()` | mismo motor puro: allow / deny / needs-approval + feedback |
-| `Ledger`, `CircuitBreaker` | ya son agnósticos — casi no cambian |
+| Trading (adaptador) | api_spend (adaptador) | Núcleo genérico |
+|---|---|---|
+| símbolo | proveedor | `Action.target` |
+| dólares por orden | dólares por llamada | `Action.cost` |
+| lista blanca de símbolos | proveedores permitidos | `Policy.allowed_targets` |
+| `max_order_usd` | `max_call_usd` | `Policy.max_cost` |
+| `weekly_cap_usd` | `per_run_budget_usd` / cap diario | `Policy.budget` / `PolicyContext.available_budget` |
+| `max_orders_per_run` | `max_calls_per_run` | `Policy.max_actions_per_run` |
+| `max_position_concentration` | `max_provider_concentration` | `Policy.max_target_concentration` |
+| umbral de aprobación | umbral de aprobación | `Policy.human_approval_threshold` |
+| (n/a) | (n/a) | `allow_irreversible` — estrena la Fase 5 |
 
-Los guardrails actuales se traducen 1:1 a primitivas de dominio general, y esa es
-la prueba de que la idea generaliza:
-
-- lista blanca de símbolos → **lista blanca de objetivos** (destinatarios, dominios, comandos, recursos)
-- `max_order_usd` → **máximo por acción** (coste, tamaño, alcance)
-- `weekly_cap_usd` → **presupuesto por ventana** (gasto diario, llamadas/hora, correos/día)
-- `max_orders_per_run` → **máximo de acciones por ejecución**
-- ventas on/off, "no vender lo que no tienes" → **acciones irreversibles/destructivas requieren confirmación**
-- `max_position_concentration` → **límite de exposición** (no más de X% a un proveedor/recurso/destinatario)
-- `human_approval_threshold_usd` → **umbral de aprobación humana** sobre cualquier eje de "coste"
-- `shadow_mode`, `to_feedback_prompt()`, circuit breaker → idénticos, ya son de propósito general
+Regla del patrón: **el core hace lo genérico; el adaptador guarda lo que es
+genuinamente de su dominio** (stop-loss y "no vender lo que no tienes" en trading;
+allowlist de *modelos* en api_spend).
 
 ---
 
-## Fase 0 — Endurecer lo que ya hay (antes de generalizar)
+## Lo que sigue
 
-No se generaliza sobre cimientos flojos.
+Con el frente (A) —núcleo transversal genérico— y los tres adaptadores ya
+cerrados, lo que queda es puramente adopción (B): políticas declarativas y
+publicación.
 
-- **Tests** de los guardrails nuevos (shadow mode, stop-loss, concentración,
-  umbral de aprobación): sin cubrir. Prioridad #1.
-- **Cablear Ledger y CircuitBreaker** dentro de `mcp_server.py` (hoy solo llama a
-  `validate_plan`; no audita ni respeta el breaker).
-- **Manejo de secretos** documentado: credenciales en entorno / `.env` (ya
-  ignorado), nunca en el repo.
+### Fase 6 — Políticas declarativas + integración ergonómica *(siguiente)*
 
-Salida: núcleo probado y auditado, con el gateway MCP integrando las tres piezas.
+Bajar la fricción de adopción de "escribir Python" a "editar config" y "una
+línea".
 
----
+- Cargar `Policy` y configs de adaptador desde **YAML/JSON** ("revisado como
+  código", versionable, diff-able). El valor de "config en un solo sitio" ya es
+  un principio del proyecto; falta hacerla declarativa.
+- Un decorador / context manager `@guarded(policy, ledger=…, breaker=…)` que
+  envuelva una tool para que validación + ledger + breaker ocurran solos.
 
-## Fase 1 — Extraer el núcleo genérico
+### Fase 7 — Publicar: empaquetado, CI, reporting y postura de seguridad
 
-Refactor sin romper el ejemplo de trading (compatibilidad hacia atrás).
+Para una herramienta pública MIT que se vende como *seguridad*, esto es lo mínimo
+creíble.
 
-- **Paso 1:** definir `Action`, `ActionPlan` y `Policy` agnósticos, y un motor
-  `validate(plan, policy, context)` con las primitivas de la tabla de arriba.
-- **Paso 2:** reescribir el trading como **adaptador de referencia** encima del
-  núcleo: `Order` es un `Action`, `GuardrailConfig` es una `Policy` de trading.
-  El API actual de trading sigue funcionando igual.
-- **Paso 3:** el Ledger y el CircuitBreaker apenas cambian (ya son genéricos);
-  ajustar nombres de campos para que no asuman "símbolo/lado".
-
-Salida: `agentrails.core` (genérico) + `agentrails.adapters.trading` (ejemplo).
-
----
-
-## Fase 2 — Un segundo adaptador que pruebe la generalidad
-
-La mejor prueba de que el núcleo es genérico es un segundo dominio **no
-financiero**. Candidatos por dificultad creciente:
-
-- **Gasto de API / presupuesto** (fácil, muy demandado): límite por llamada,
-  presupuesto diario, corte tras N fallos. Ideal para agentes que consumen LLMs.
-- **Envío de correos/mensajes** (medio): lista blanca de destinatarios, tope
-  diario, aprobación humana por encima de X destinatarios, dry-run que muestra qué
-  se enviaría.
-- **Ejecución de comandos/código** (alto valor, alto riesgo): lista blanca de
-  comandos, bloqueo de operaciones destructivas sin confirmación, registro
-  auditable de todo lo ejecutado.
-
-Elegir **uno** y construirlo entero (modelo + política + validación + ejemplo +
-tests). Con dos adaptadores funcionando, el mensaje del proyecto es demostrable,
-no teórico.
-
----
-
-## Fase 3 — Documentación y posicionamiento como herramienta de dev
-
-Siendo público y MIT, el valor crece si otros lo adoptan.
-
-- README reorientado: "capa de seguridad para agentes de IA", con trading y el
-  segundo adaptador como ejemplos.
-- Guía de "escribe tu propio adaptador" (el patrón en ~30 líneas).
-- Ejemplos de integración con MCP / Claude Desktop / frameworks de agentes.
+- **Release:** publicar en PyPI; GitHub Actions corriendo los tests en 3.10–3.12;
+  `CHANGELOG`.
+- **Reporting:** CLI `agentrails report` que lee el ledger y muestra propuesto vs.
+  bloqueado vs. ejecutado, gasto en el tiempo, objetivos más bloqueados.
+- **`SECURITY.md` honesto:** qué protege y qué NO. AgentRails valida el *plan
+  declarado*; **no es un sandbox** y no puede detener a un agente que nunca lo
+  llame. Ese límite de confianza, dicho claro, es diferenciador — no un defecto
+  que ocultar.
 
 ---
 
@@ -119,14 +107,18 @@ Siendo público y MIT, el valor crece si otros lo adoptan.
 - **No decide qué hacer.** Decide qué está *permitido* hacer y lo deja registrado.
 - **No es un servicio alojado ni guarda credenciales.** Nada habla con la red por
   su cuenta; las claves y las cuentas son del usuario, en su máquina.
+- **No es un sandbox.** Hace cumplir el plan que el agente le declara; no aísla ni
+  intercepta lo que un agente haga por fuera de él (ver Fase 7, `SECURITY.md`).
 
 ---
 
 ## Siguiente acción inmediata
 
-Cerrar la **Fase 0** (tests + cablear ledger/breaker en el gateway) y, en paralelo,
-decidir el **segundo adaptador** de la Fase 2 — porque esa elección es la que
-convierte "librería de trading con ínfulas" en "capa de seguridad para agentes".
+Con los tres adaptadores cerrados, arrancar la **Fase 6**: hacer las políticas
+**declarativas** (cargar `Policy` y config de adaptador desde YAML/JSON, revisable
+como código) y un decorador `@guarded(policy, ledger=…, breaker=…)` que envuelva
+una tool para que validación + ledger + breaker ocurran solos. Es la palanca de
+adopción antes de publicar (Fase 7).
 
 > Herramienta para automatizar acciones propias con credenciales propias. No es
 > consejo de inversión ni de ningún tipo. AgentRails hace cumplir los límites que

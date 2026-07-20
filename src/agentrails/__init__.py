@@ -14,10 +14,19 @@ from .models import OrderSide, PlannedOrder, TradePlan, AccountState
 from .guardrails import GuardrailConfig, GuardrailError, validate_plan
 from .ledger import Ledger, LedgerEntry
 from .circuit_breaker import CircuitBreaker, CircuitBreakerState
+from .core import (
+    Action,
+    ActionPlan,
+    Policy,
+    PolicyContext,
+    PolicyError,
+    validate_actions,
+)
 
 __version__ = "0.1.0"
 
 __all__ = [
+    # Trading domain (reference adapter)
     "OrderSide",
     "PlannedOrder",
     "TradePlan",
@@ -25,8 +34,16 @@ __all__ = [
     "GuardrailConfig",
     "GuardrailError",
     "validate_plan",
+    # Cross-cutting
     "Ledger",
     "LedgerEntry",
     "CircuitBreaker",
     "CircuitBreakerState",
+    # Generic core
+    "Action",
+    "ActionPlan",
+    "Policy",
+    "PolicyContext",
+    "PolicyError",
+    "validate_actions",
 ]

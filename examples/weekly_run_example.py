@@ -46,7 +46,7 @@ CONFIG = GuardrailConfig(
 LEDGER = Ledger("reports/trade_ledger.csv")
 BREAKER = CircuitBreaker(
     "reports/circuit_breaker.json",
-    max_consecutive_losses=5,
+    max_consecutive_failures=5,
     max_drawdown_pct=0.35,
     cooldown_hours=4,
 )

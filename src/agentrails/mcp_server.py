@@ -1,52 +1,177 @@
 """Reference MCP gateway for AgentRails.
 
-Exposes a single `evaluate_and_place_trade` tool that an agent calls with a
-proposed set of orders. The gateway does the full safety pass:
+Exposes two tools an agent can call before it acts:
 
-    1. Circuit breaker — if the account is paused after a bad run, refuse.
-    2. validate_plan — enforce every configured guardrail.
-    3. Ledger — record what happened (rejected / dry-run / placed) so there is
-       an auditable trail, not just a claim in a chat transcript.
+    evaluate_actions          — GENERIC: evaluate any proposed agent actions
+                                (API calls, messages, commands, ...) against a
+                                domain-agnostic safety Policy. Built on
+                                `agentrails.core.validate_actions`.
+    evaluate_and_place_trade  — TRADING: the reference adapter tool, kept as a
+                                worked example of a domain-specific gateway on
+                                top of the same safety pass.
 
-This is an EXAMPLE wiring, not a hosted service. It uses mock demo account/
-config and never talks to a real broker. See MASTER_PLAN.md for how to turn it
-into a paper-trading (then live) gateway.
+Both run the same three-step pass:
+
+    1. Circuit breaker — if the scope is paused after a bad run, refuse.
+    2. validate — enforce every configured guardrail / policy limit.
+    3. Ledger — record what happened (rejected / dry-run / placed / skipped) so
+       there is an auditable trail, not just a claim in a chat transcript.
+
+This is an EXAMPLE wiring, not a hosted service. It uses mock demo config and
+never talks to a real broker or any other live system.
 """
+
+from __future__ import annotations
 
 from typing import List
 
 try:
     from mcp.server.fastmcp import FastMCP
-except ImportError:
-    import sys
-    print("The 'mcp' package is required. Install it with `pip install agentrails[mcp]`.")
-    sys.exit(1)
 
-from agentrails.models import TradePlan, PlannedOrder, OrderSide, AccountState
-from agentrails.guardrails import GuardrailConfig, validate_plan, GuardrailError
-from agentrails.ledger import Ledger
+    _HAS_MCP = True
+except ImportError:
+    _HAS_MCP = False
+
+    class FastMCP:  # minimal shim used only when the optional `mcp` dep is absent
+        """Fallback so this module still imports (and its evaluation logic can be
+        unit-tested) without the optional `mcp` package. Actually serving the
+        gateway requires `pip install agentrails[mcp]`."""
+
+        def __init__(self, name: str):
+            self.name = name
+
+        def tool(self, *args, **kwargs):
+            def _decorator(fn):
+                return fn
+
+            return _decorator
+
+        def run(self):
+            raise SystemExit(
+                "The 'mcp' package is required to run the gateway. "
+                "Install it with `pip install agentrails[mcp]`."
+            )
+
+
 from agentrails.circuit_breaker import CircuitBreaker
+from agentrails.core import Action, ActionPlan, Policy, PolicyError, validate_actions
+from agentrails.guardrails import GuardrailConfig, GuardrailError, validate_plan
+from agentrails.ledger import Ledger
+from agentrails.models import AccountState, OrderSide, PlannedOrder, TradePlan
 
 # Initialize FastMCP Server
 mcp = FastMCP("AgentRails_Gateway")
 
 # --------------------------------------------------------------------------- #
-# Audit trail + account-level circuit breaker.
+# Audit trail + scope-level circuit breaker.
 # Both write under reports/ (gitignored). In production point these at durable
 # storage outside the instance.
 # --------------------------------------------------------------------------- #
 LEDGER = Ledger("reports/mcp_ledger.csv")
 BREAKER = CircuitBreaker(
     "reports/mcp_circuit_breaker.json",
-    max_consecutive_losses=5,
+    max_consecutive_failures=5,
     max_drawdown_pct=0.35,
     cooldown_hours=4.0,
 )
 
-# A mock account state and config for demonstration purposes.
-# PHASE 2 (see MASTER_PLAN.md): replace DEMO_ACCOUNT with the REAL account state
-# fetched from your broker (buying power + positions) before going to paper/live,
-# or the cash and concentration checks validate against fictional numbers.
+
+# --------------------------------------------------------------------------- #
+# GENERIC tool — the point of AgentRails: guard ANY agent action.
+# --------------------------------------------------------------------------- #
+
+# Demo policy. Fails closed and, unlike the trading demo, blocks irreversible
+# actions by default so a destructive command/delete is denied unless explicitly
+# allowed. Replace with a policy loaded from your own config.
+DEMO_POLICY = Policy(
+    scope_id="agent-session",
+    allowed_targets={"anthropic", "openai", "search-api"},
+    dry_run=True,
+    max_cost=1.00,  # hard per-action ceiling
+    # Approval band sits *below* the ceiling: actions over 0.50 (but <= 1.00) are
+    # allowed only with human sign-off. Keep this < max_cost or the band is empty.
+    human_approval_threshold=0.50,
+    max_actions_per_run=20,
+    budget=5.00,
+    # max_target_concentration is intentionally left off here: with a single
+    # target it always trips (100% > any share), which would reject the simplest
+    # plans. Concentration shines with multi-target plans — see the adapters.
+    allow_irreversible=False,
+)
+
+
+@mcp.tool()
+def evaluate_actions(actions: List[dict]) -> str:
+    """Evaluate a proposed set of agent actions against the AgentRails safety
+    policy. Domain-agnostic: the actions can be API calls, messages, commands,
+    infra changes — anything with a target and a cost. If the plan passes it
+    would be executed by YOUR code (simulated here); if it fails it returns a
+    structured feedback prompt the LLM can use to self-correct.
+
+    Args:
+        actions: A list of dicts. Each must have: action_type (str),
+                 target (str), cost (float); optionally reversible (bool,
+                 default True) and reason (str).
+    """
+    parsed: list[Action] = []
+    for a in actions:
+        if "target" not in a:
+            return "Invalid action: missing 'target'."
+        parsed.append(
+            Action(
+                action_type=str(a.get("action_type", "action")),
+                target=str(a["target"]),
+                cost=float(a.get("cost", 0.0)),
+                reversible=bool(a.get("reversible", True)),
+                reason=str(a.get("reason", "")),
+            )
+        )
+
+    plan = ActionPlan(
+        scope_id=DEMO_POLICY.scope_id,
+        generated_for="mcp-session-001",
+        dry_run=DEMO_POLICY.dry_run,
+        actions=parsed,
+    )
+
+    # 1. Circuit breaker.
+    if BREAKER.is_tripped():
+        LEDGER.record_action_plan(plan, status="skipped")
+        return (
+            f"Circuit breaker is TRIPPED ({BREAKER.state.reason}); no new actions "
+            "accepted until it resets. This is a safety pause after a bad run, "
+            "not an error in your plan."
+        )
+
+    # 2. Policy.
+    try:
+        validate_actions(plan, DEMO_POLICY)
+    except PolicyError as e:
+        LEDGER.record_action_plan(plan, status="rejected")
+        if e.requires_human_approval:
+            return (
+                "Action plan requires HUMAN APPROVAL.\n"
+                f"Reason: {e.message}\n"
+                "A notification has been sent to the user. You must wait for their approval."
+            )
+        return e.to_feedback_prompt()
+
+    # 3. Passed. In a real gateway YOUR code executes each action here, then feeds
+    #    any failures to BREAKER. In dry-run we only record the intent.
+    status = "dry_run" if DEMO_POLICY.dry_run else "placed"
+    LEDGER.record_action_plan(plan, status=status)
+    return (
+        f"SUCCESS: Passed all safety checks. Recorded {len(plan.actions)} "
+        f"actions ({status}) for a total cost of {plan.cost_total:.2f}."
+    )
+
+
+# --------------------------------------------------------------------------- #
+# TRADING tool — reference adapter gateway on top of the same pass.
+# Before paper/live, replace DEMO_ACCOUNT with the REAL account state fetched
+# from your broker (buying power + positions), or the cash and concentration
+# checks validate against fictional numbers.
+# --------------------------------------------------------------------------- #
 DEMO_ACCOUNT = AccountState(
     account_id="user-account-123",
     buying_power=5000.0,
