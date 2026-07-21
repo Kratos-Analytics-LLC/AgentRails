@@ -108,7 +108,9 @@ Two cross-cutting pieces sit alongside the validator:
 
 - **`Ledger`** — an append-only CSV audit trail: every action ever proposed,
   dry-run, executed, rejected or skipped is a line in a file you can open in
-  Excel, not a claim in a chat transcript.
+  Excel, not a claim in a chat transcript. `agentrails report ledger.csv` turns
+  it into a summary (proposed vs. blocked vs. executed, top targets); add
+  `--json` for machine output.
 - **`CircuitBreaker`** — a file-backed pause switch that survives process
   restarts, so a scheduled agent that starts cold still remembers it's tripped
   after a bad run.
@@ -285,7 +287,8 @@ it.
 
 v0.1 — the generic core (allowlist, size and budget limits, human-approval
 threshold, concentration, irreversibility, shadow mode), the ledger, the circuit
-breaker, declarative policies (JSON/YAML), the `@guarded` wrapper, a reference
-MCP gateway, and three reference adapters (**trading**, **api_spend**, **shell**)
-are implemented and tested (124 passing tests). No published package yet. Built
-and maintained by Kratos Analytics LLC.
+breaker, declarative policies (JSON/YAML), the `@guarded` wrapper, the
+`agentrails report` CLI, a reference MCP gateway, and three reference adapters
+(**trading**, **api_spend**, **shell**) are implemented and tested (129 passing
+tests, CI on Python 3.10–3.13). See `SECURITY.md` for the trust boundary. Not yet
+published to PyPI. Built and maintained by Kratos Analytics LLC.

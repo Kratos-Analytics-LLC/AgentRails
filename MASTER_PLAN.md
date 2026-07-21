@@ -25,10 +25,11 @@ referencia, no como el producto.
 
 ## Estado actual (2026-07-18)
 
-Fases 0 a 6 **completadas**. El núcleo genérico existe, tiene tres adaptadores de
-dominios muy distintos (finanzas / gasto de API / sistemas), el
-gateway/ledger/breaker ya son genéricos, las políticas son declarativas (JSON/
-YAML) con integración de una línea (`@guarded`), y el README vende la capa
+Fases 0 a 6 **completadas** y la 7 casi entera (solo falta el push a PyPI, que se
+deja al mantenedor). El núcleo genérico existe, tiene tres adaptadores de dominios
+muy distintos (finanzas / gasto de API / sistemas), el gateway/ledger/breaker ya
+son genéricos, las políticas son declarativas (JSON/YAML) con integración de una
+línea (`@guarded`), hay CLI + CI + `SECURITY.md`, y el README vende la capa
 general, no un bot.
 
 | Fase | Estado | Qué quedó entregado |
@@ -40,9 +41,9 @@ general, no un bot.
 | 4 — Des-tradingizar el núcleo transversal | ✅ | Gateway MCP con herramienta genérica `evaluate_actions`; `Ledger` con esquema `target`/`action_type`/`cost` (`record_action`); `CircuitBreaker` con `record_failure`/`record_success`/`update_value`. Los nombres de trading (`record`, `record_trade_result`, `update_equity`) quedan como alias del adaptador. |
 | 5 — Tercer adaptador: ejecución de comandos/shell | ✅ | `adapters.shell` completo: `CommandRequest`/`CommandPlan`/`ShellPolicy` + `validate_commands`. Estrena `reversible=False` (bloquea `rm -rf`, `git push --force`, `DROP TABLE`, fork bombs) y añade un guard de operadores de shell (`;`, `\|`, `` ` ``, `$( )`). Ejemplo + 19 tests. |
 | 6 — Políticas declarativas + integración ergonómica | ✅ | `config.py`: `load_policy`/`save_policy`/`policy_from_dict` (JSON en stdlib, YAML opcional vía `[yaml]`, falla cerrado ante claves desconocidas). `guard.py`: `Guard` + decorador `@guarded` (breaker → validación → ledger → ejecutar). Ejemplo ejecutable + 19 tests. |
+| 7 — Publicar (CI, seguridad, reporting, release) | 🟡 | CI en GitHub Actions (3.10–3.13); `SECURITY.md` con el límite de confianza; CLI `agentrails report` sobre el ledger (+5 tests); `CHANGELOG.md`; `pyproject` con `[project.scripts]` y build (sdist+wheel) verificado. **Falta:** push a PyPI (lo hace el mantenedor) y URLs reales del repo. |
 
-**124 tests en verde.** Cargar la política es declarativo y envolver una tool es
-una línea.
+**129 tests en verde.** El paquete construye y expone el comando `agentrails`.
 
 ---
 
@@ -71,22 +72,19 @@ allowlist de *modelos* en api_spend).
 
 ## Lo que sigue
 
-Con el núcleo, los tres adaptadores y la ergonomía de adopción ya cerrados, solo
-queda **publicar**.
+La Fase 7 está casi entera (CI, `SECURITY.md`, CLI `agentrails report`,
+`CHANGELOG`, build verificado). Lo único pendiente lo hace el mantenedor a mano,
+porque toca hacia afuera y no se automatiza a ciegas:
 
-### Fase 7 — Publicar: empaquetado, CI, reporting y postura de seguridad *(siguiente)*
+- **Release a PyPI:** `python -m build` ya produce sdist+wheel; falta un
+  `twine upload` con las credenciales del mantenedor (idealmente vía Trusted
+  Publishing de GitHub Actions con un tag `v0.1.0`).
+- **URLs reales del repo** en `pyproject` (`[project.urls]`, hoy comentadas).
+- **Opcional:** badge de CI en el README y un tag/GitHub Release.
 
-Para una herramienta pública MIT que se vende como *seguridad*, esto es lo mínimo
-creíble.
-
-- **Release:** publicar en PyPI; GitHub Actions corriendo los tests en 3.10–3.12;
-  `CHANGELOG`.
-- **Reporting:** CLI `agentrails report` que lee el ledger y muestra propuesto vs.
-  bloqueado vs. ejecutado, gasto en el tiempo, objetivos más bloqueados.
-- **`SECURITY.md` honesto:** qué protege y qué NO. AgentRails valida el *plan
-  declarado*; **no es un sandbox** y no puede detener a un agente que nunca lo
-  llame. Ese límite de confianza, dicho claro, es diferenciador — no un defecto
-  que ocultar.
+Ideas más allá del plan actual, si el proyecto gana tracción: cuarto adaptador
+(envío de correos/mensajes), políticas por-adaptador declarativas (no solo el
+`Policy` genérico), y un modo "shadow" agregable en el CLI (qué habría bloqueado).
 
 ---
 
@@ -104,10 +102,10 @@ creíble.
 
 ## Siguiente acción inmediata
 
-Con la ergonomía de adopción cerrada (Fase 6), arrancar la **Fase 7**: publicar.
-Lo mínimo creíble para una herramienta pública de *seguridad* — CI en GitHub
-Actions (3.10–3.12), `SECURITY.md` honesto sobre el límite de confianza, un CLI
-`agentrails report` sobre el ledger, y el release a PyPI.
+El plan está esencialmente completo. La última acción es del mantenedor:
+**publicar `v0.1.0` en PyPI** (rellenar las URLs del repo, taggear `v0.1.0`, y
+`twine upload` o Trusted Publishing). Todo lo demás — núcleo, tres adaptadores,
+políticas declarativas, `@guarded`, CLI, CI y `SECURITY.md` — ya está en verde.
 
 > Herramienta para automatizar acciones propias con credenciales propias. No es
 > consejo de inversión ni de ningún tipo. AgentRails hace cumplir los límites que

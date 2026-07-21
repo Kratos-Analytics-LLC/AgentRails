@@ -26,5 +26,13 @@ dev = ["pytest>=7.0"]
 mcp = ["mcp>=1.0.0"]
 yaml = ["pyyaml>=6.0"]
 
+[project.scripts]
+agentrails = "agentrails.cli:main"
+
+# TODO(before PyPI publish): add real project URLs.
+# [project.urls]
+# Homepage = "https://github.com/<org>/agentrails"
+# Repository = "https://github.com/<org>/agentrails"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentrails"]
