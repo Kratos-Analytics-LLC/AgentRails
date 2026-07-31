@@ -88,6 +88,18 @@ Ideas más allá del plan actual, si el proyecto gana tracción: cuarto adaptado
 
 ---
 
+## Decisión de negocio (2026-07-31)
+
+AgentRails se mantiene 100% open-source y MIT, sin plan de monetización directa
+(sin capa de pago, sin servicio hospedado). Su función es atraer clientes de
+consultoría y demostrar capacidad técnica de Kratos Analytics LLC en desarrollo
+de software y sistemas de agentes — el retorno es reputacional, no una línea de
+ingreso del paquete en sí. Si el proyecto gana tracción real, un modelo open-core
+(capa de pago opcional sobre la librería gratis) queda abierto como opción futura,
+pero no es parte del plan actual.
+
+---
+
 ## Lo que este proyecto NO es
 
 - **No es un bot de trading.** Esa parte ya está resuelta en otro lado; aquí el

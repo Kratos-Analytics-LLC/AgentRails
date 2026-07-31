@@ -289,6 +289,18 @@ v0.1 — the generic core (allowlist, size and budget limits, human-approval
 threshold, concentration, irreversibility, shadow mode), the ledger, the circuit
 breaker, declarative policies (JSON/YAML), the `@guarded` wrapper, the
 `agentrails report` CLI, a reference MCP gateway, and three reference adapters
-(**trading**, **api_spend**, **shell**) are implemented and tested (129 passing
+(**trading**, **api_spend**, **shell**) are implemented and tested (133 passing
 tests, CI on Python 3.10–3.13). See `SECURITY.md` for the trust boundary. Not yet
-published to PyPI. Built and maintained by Kratos Analytics LLC.
+published to PyPI.
+
+## About
+
+AgentRails is built and maintained by **[Kratos Analytics LLC](https://github.com/Kratos-Analytics-LLC)**,
+a quantitative data analytics and software development firm specializing in big
+data solutions and algorithmic trading engines. It's released as open-source,
+MIT-licensed infrastructure — not a paid product — because the pattern is worth
+having in the open.
+
+If you're building AI agents that need real guardrails in production (trading,
+ops automation, API-spend control, or your own domain) and want help designing
+or hardening the policy layer, reach out: **kratosanalyticsllc@gmail.com**.

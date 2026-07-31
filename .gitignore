@@ -36,6 +36,11 @@ state_*.json
 circuit_breaker.json
 trade_ledger.csv
 
+# ---- Local Claude Code tooling (not part of the AgentRails project) ----
+.claude/
+CLAUDE.md
+graphify-out/
+
 # ---- OS / editor ----
 .DS_Store
 Thumbs.db
