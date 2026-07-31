@@ -5,24 +5,34 @@ build-backend = "hatchling.build"
 [project]
 name = "agentrails"
 version = "0.1.0"
-description = "Guardrails, dry-run harness and audit ledger for AI agents that place real broker orders."
+description = "A domain-agnostic safety layer for AI agents: declarative policy, dry-run, audit ledger and circuit breaker between an agent's proposed actions and their execution."
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [{ name = "Kratos Analytics LLC" }]
-keywords = ["mcp", "agents", "trading", "guardrails", "claude", "brokerage", "risk-management"]
+keywords = ["mcp", "agents", "guardrails", "claude", "ai-safety", "governance", "risk-management", "llm"]
 classifiers = [
     "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
-    "Topic :: Office/Business :: Financial :: Investment",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Topic :: Security",
 ]
 dependencies = []
 
 [project.optional-dependencies]
 dev = ["pytest>=7.0"]
 mcp = ["mcp>=1.0.0"]
+yaml = ["pyyaml>=6.0"]
+
+[project.scripts]
+agentrails = "agentrails.cli:main"
+
+# TODO(before PyPI publish): add real project URLs.
+# [project.urls]
+# Homepage = "https://github.com/<org>/agentrails"
+# Repository = "https://github.com/<org>/agentrails"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentrails"]
