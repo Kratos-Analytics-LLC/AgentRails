@@ -29,10 +29,11 @@ yaml = ["pyyaml>=6.0"]
 [project.scripts]
 agentrails = "agentrails.cli:main"
 
-# TODO(before PyPI publish): add real project URLs.
-# [project.urls]
-# Homepage = "https://github.com/<org>/agentrails"
-# Repository = "https://github.com/<org>/agentrails"
+[project.urls]
+Homepage = "https://github.com/Kratos-Analytics-LLC/AgentRails"
+Repository = "https://github.com/Kratos-Analytics-LLC/AgentRails"
+Issues = "https://github.com/Kratos-Analytics-LLC/AgentRails/issues"
+Changelog = "https://github.com/Kratos-Analytics-LLC/AgentRails/blob/main/CHANGELOG.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/agentrails"]
