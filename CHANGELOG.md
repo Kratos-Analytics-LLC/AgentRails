@@ -39,12 +39,28 @@ safety layer for AI agents.
 
 - **Ledger** schema is now generic (`target` / `action_type` / `cost` via
   `record_action` / `record_action_plan`); the trading `record` / `record_plan`
-  remain as adapter aliases. Added a `failed` status.
+  remain as adapter aliases. Added `failed` and `shadow` statuses.
 - **CircuitBreaker** base API is generic (`record_failure` / `record_success` /
   `update_value`); a failure now trips on the spot. `record_trade_result` /
   `update_equity` remain as trading aliases, and legacy state files still load.
 - README reoriented as "a safety layer for AI agents"; package description and
   keywords generalized away from trading.
+
+### Fixed
+
+- **`Guard` / `@guarded` under a shadow-mode policy** no longer silently
+  discards violations. `validate_actions` returns (not raises) in shadow mode, so
+  `authorize` used to ignore its result and execute unguarded with no record. It
+  now logs would-be rejections as `shadow` while still not blocking, so the
+  observation is auditable.
+- **`CircuitBreaker.is_tripped()`** no longer crashes on a `tripped` state file
+  with no `tripped_at` (hand-edited or partially written). It fails closed:
+  starts the cooldown clock and stays paused instead of raising on
+  `datetime.fromisoformat(None)`.
+- **`agentrails.mcp_server`** no longer creates `reports/` on disk merely by
+  being imported. `LEDGER`/`BREAKER` are now built lazily on first use;
+  `mcp_server.LEDGER` / `.BREAKER` still work the same way for external callers
+  via a module-level `__getattr__`.
 
 ### Notes
 

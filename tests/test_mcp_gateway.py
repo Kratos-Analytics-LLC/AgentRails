@@ -6,9 +6,28 @@ the Phase 4 proof that the gateway is no longer trading-only: the same three-ste
 pass (circuit breaker -> policy -> ledger) now guards arbitrary agent actions.
 The trading tool is exercised by the trading/guardrail suites."""
 
+import os
+import subprocess
+import sys
 from datetime import datetime, timezone
 
 import agentrails.mcp_server as gw
+
+
+def test_import_has_no_disk_side_effect(tmp_path):
+    # LEDGER/BREAKER used to be built at import time, which meant merely
+    # `import agentrails.mcp_server` created reports/ on disk as a side effect —
+    # even from a test collector or a static-analysis tool that never calls a
+    # tool. They're now lazy; importing alone must touch nothing.
+    result = subprocess.run(
+        [sys.executable, "-c", "import agentrails.mcp_server"],
+        cwd=tmp_path,
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert not (tmp_path / "reports").exists()
 
 
 def setup_function():

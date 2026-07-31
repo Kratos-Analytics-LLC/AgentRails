@@ -62,6 +62,20 @@ def test_zero_cooldown_never_blocks():
         assert cb.is_tripped() is False
 
 
+def test_tripped_without_timestamp_does_not_crash():
+    # A hand-edited or partially written state file can be tripped with no
+    # tripped_at. is_tripped() must fail closed (stay paused) instead of blowing
+    # up on datetime.fromisoformat(None).
+    with tempfile.TemporaryDirectory() as d:
+        path = Path(d) / "cb.json"
+        path.write_text('{"tripped": true}')  # no tripped_at
+        cb = CircuitBreaker(path, max_consecutive_failures=1, cooldown_hours=1)
+        assert cb.is_tripped() is True
+        assert cb.state.tripped_at is not None  # clock was started
+        # and it persisted, so a fresh instance agrees
+        assert CircuitBreaker(path, cooldown_hours=1).is_tripped() is True
+
+
 def test_state_persists_across_instances():
     with tempfile.TemporaryDirectory() as d:
         path = Path(d) / "cb.json"

@@ -124,6 +124,13 @@ class CircuitBreaker:
         permanent kill switch. `cooldown_hours=0` means no pause at all."""
         if not self.state.tripped:
             return False
+        if self.state.tripped_at is None:
+            # Inconsistent state (tripped with no timestamp — a hand-edited or
+            # partially written file). Fail closed: start the cooldown clock now
+            # and stay paused, rather than crash on datetime.fromisoformat(None).
+            self.state.tripped_at = datetime.now(timezone.utc).isoformat()
+            self._save()
+            return True
         tripped_at = datetime.fromisoformat(self.state.tripped_at)
         if datetime.now(timezone.utc) - tripped_at >= timedelta(hours=self.cooldown_hours):
             self.reset()

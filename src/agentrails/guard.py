@@ -44,15 +44,22 @@ class Guard:
     def authorize(self, plan: ActionPlan) -> None:
         """Raise if the plan can't proceed — `CircuitBreakerTripped` if the
         breaker is tripped (logged `skipped`), or `PolicyError` if it violates the
-        policy (logged `rejected`). Returns None if the plan is clear."""
+        policy (logged `rejected`). Returns None if the plan is clear.
+
+        Under a shadow-mode policy the core collects violations instead of
+        raising: we don't block, but we record them as `shadow` so "what would
+        have been rejected" is still auditable rather than silently discarded.
+        The plan then proceeds through `run` exactly as a clean one would."""
         if self.breaker is not None and self.breaker.is_tripped():
             self._log(plan, "skipped")
             raise CircuitBreakerTripped(self.breaker.state.reason)
         try:
-            validate_actions(plan, self.policy)
+            violations = validate_actions(plan, self.policy)
         except PolicyError:
             self._log(plan, "rejected")
             raise
+        if violations:  # only possible under shadow_mode; observe, don't block
+            self._log(plan, "shadow")
 
     def run(self, plan: ActionPlan, execute: Callable[[ActionPlan], Any]) -> Any:
         """Authorize the plan, then either dry-run (log and skip execution) or run

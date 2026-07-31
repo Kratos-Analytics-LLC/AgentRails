@@ -66,14 +66,43 @@ mcp = FastMCP("AgentRails_Gateway")
 # Audit trail + scope-level circuit breaker.
 # Both write under reports/ (gitignored). In production point these at durable
 # storage outside the instance.
+#
+# Built lazily, not at import time: `Ledger.__init__` creates reports/ and the
+# CSV file on disk immediately, so a module-level instance meant importing this
+# file (e.g. from a test collector or a static-analysis tool) always wrote to
+# disk as a side effect. `_get_ledger`/`_get_breaker` defer that until this
+# module's tools are actually used; `__getattr__` keeps `mcp_server.LEDGER` /
+# `.BREAKER` working the same way for external callers (tests included).
 # --------------------------------------------------------------------------- #
-LEDGER = Ledger("reports/mcp_ledger.csv")
-BREAKER = CircuitBreaker(
-    "reports/mcp_circuit_breaker.json",
-    max_consecutive_failures=5,
-    max_drawdown_pct=0.35,
-    cooldown_hours=4.0,
-)
+_LEDGER: Ledger | None = None
+_BREAKER: CircuitBreaker | None = None
+
+
+def _get_ledger() -> Ledger:
+    global _LEDGER
+    if _LEDGER is None:
+        _LEDGER = Ledger("reports/mcp_ledger.csv")
+    return _LEDGER
+
+
+def _get_breaker() -> CircuitBreaker:
+    global _BREAKER
+    if _BREAKER is None:
+        _BREAKER = CircuitBreaker(
+            "reports/mcp_circuit_breaker.json",
+            max_consecutive_failures=5,
+            max_drawdown_pct=0.35,
+            cooldown_hours=4.0,
+        )
+    return _BREAKER
+
+
+def __getattr__(name: str):
+    if name == "LEDGER":
+        return _get_ledger()
+    if name == "BREAKER":
+        return _get_breaker()
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 
 # --------------------------------------------------------------------------- #
@@ -134,11 +163,14 @@ def evaluate_actions(actions: List[dict]) -> str:
         actions=parsed,
     )
 
+    ledger = _get_ledger()
+    breaker = _get_breaker()
+
     # 1. Circuit breaker.
-    if BREAKER.is_tripped():
-        LEDGER.record_action_plan(plan, status="skipped")
+    if breaker.is_tripped():
+        ledger.record_action_plan(plan, status="skipped")
         return (
-            f"Circuit breaker is TRIPPED ({BREAKER.state.reason}); no new actions "
+            f"Circuit breaker is TRIPPED ({breaker.state.reason}); no new actions "
             "accepted until it resets. This is a safety pause after a bad run, "
             "not an error in your plan."
         )
@@ -147,7 +179,7 @@ def evaluate_actions(actions: List[dict]) -> str:
     try:
         validate_actions(plan, DEMO_POLICY)
     except PolicyError as e:
-        LEDGER.record_action_plan(plan, status="rejected")
+        ledger.record_action_plan(plan, status="rejected")
         if e.requires_human_approval:
             return (
                 "Action plan requires HUMAN APPROVAL.\n"
@@ -157,9 +189,9 @@ def evaluate_actions(actions: List[dict]) -> str:
         return e.to_feedback_prompt()
 
     # 3. Passed. In a real gateway YOUR code executes each action here, then feeds
-    #    any failures to BREAKER. In dry-run we only record the intent.
+    #    any failures to the breaker. In dry-run we only record the intent.
     status = "dry_run" if DEMO_POLICY.dry_run else "placed"
-    LEDGER.record_action_plan(plan, status=status)
+    ledger.record_action_plan(plan, status=status)
     return (
         f"SUCCESS: Passed all safety checks. Recorded {len(plan.actions)} "
         f"actions ({status}) for a total cost of {plan.cost_total:.2f}."
@@ -232,18 +264,21 @@ def evaluate_and_place_trade(orders: List[dict]) -> str:
         orders=parsed_orders,
     )
 
+    ledger = _get_ledger()
+    breaker = _get_breaker()
+
     # 1. Circuit breaker: if the account is paused after a losing streak or a
     #    drawdown, refuse new entries and record the skip.
-    if BREAKER.is_tripped():
-        LEDGER.record_plan(plan, status="skipped")
+    if breaker.is_tripped():
+        ledger.record_plan(plan, status="skipped")
         return (
             "Circuit breaker is TRIPPED "
-            f"({BREAKER.state.reason}); no new orders accepted until it resets. "
+            f"({breaker.state.reason}); no new orders accepted until it resets. "
             "This is a safety pause after a bad run, not an error in your plan."
         )
 
     # Track account equity so the breaker can measure drawdown over time.
-    BREAKER.update_equity(
+    breaker.update_equity(
         DEMO_ACCOUNT.buying_power + sum(DEMO_ACCOUNT.positions.values())
     )
 
@@ -251,7 +286,7 @@ def evaluate_and_place_trade(orders: List[dict]) -> str:
     try:
         validate_plan(plan, DEMO_CONFIG, DEMO_ACCOUNT)
     except GuardrailError as e:
-        LEDGER.record_plan(plan, status="rejected")
+        ledger.record_plan(plan, status="rejected")
         if e.requires_human_approval:
             return (
                 "Trade plan requires HUMAN APPROVAL.\n"
@@ -261,10 +296,10 @@ def evaluate_and_place_trade(orders: List[dict]) -> str:
         return e.to_feedback_prompt()
 
     # 3. Passed. In a real gateway you would place each order via the broker here,
-    #    then call BREAKER.record_trade_result(pnl) once fills settle. In dry-run
+    #    then call breaker.record_trade_result(pnl) once fills settle. In dry-run
     #    we only record the intent to the ledger.
     status = "dry_run" if DEMO_CONFIG.dry_run else "placed"
-    LEDGER.record_plan(plan, status=status)
+    ledger.record_plan(plan, status=status)
 
     total_val = sum(o.dollar_amount for o in plan.orders)
     return (

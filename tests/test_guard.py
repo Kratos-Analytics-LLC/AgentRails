@@ -112,6 +112,34 @@ def test_run_rejected_plan_never_executes():
     assert calls == []
 
 
+# --- shadow mode -----------------------------------------------------------
+
+
+def test_shadow_mode_does_not_block_but_records_violation():
+    # A shadow policy observes instead of blocking: the executor still runs, and
+    # the violation that WOULD have been rejected is logged as `shadow` rather
+    # than silently discarded.
+    with tempfile.TemporaryDirectory() as d:
+        led = ledger(d)
+        g = Guard(make_policy(shadow_mode=True, dry_run=False), ledger=led)
+        ran = []
+        result = g.run(plan([Action("call", "zzz", cost=1)]), lambda p: ran.append(p) or "ok")
+        assert result == "ok"  # not blocked
+        assert ran  # executor actually ran
+        statuses = [r["status"] for r in led.read_all()]
+        assert "shadow" in statuses  # the would-be rejection is on the record
+        assert "placed" in statuses  # and what actually happened is too
+
+
+def test_shadow_mode_clean_plan_logs_no_shadow_row():
+    with tempfile.TemporaryDirectory() as d:
+        led = ledger(d)
+        g = Guard(make_policy(shadow_mode=True, dry_run=False), ledger=led)
+        g.run(plan(), lambda p: "ok")  # clean plan
+        statuses = [r["status"] for r in led.read_all()]
+        assert "shadow" not in statuses
+
+
 # --- decorator -------------------------------------------------------------
 
 
