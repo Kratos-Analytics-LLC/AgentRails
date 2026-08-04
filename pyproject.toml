@@ -3,7 +3,7 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [project]
-name = "agentrails"
+name = "kratos-agentrails"
 version = "0.1.0"
 description = "A domain-agnostic safety layer for AI agents: declarative policy, dry-run, audit ledger and circuit breaker between an agent's proposed actions and their execution."
 readme = "README.md"

@@ -4,7 +4,7 @@ All notable changes to AgentRails are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to
 follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.1.0] - 2026-08-04
 
 The release that turns AgentRails from a trading library into a domain-agnostic
 safety layer for AI agents.
@@ -64,4 +64,5 @@ safety layer for AI agents.
 
 ### Notes
 
-- No published package yet. `requires-python >= 3.10`.
+- Published on PyPI as `kratos-agentrails` (the import name and CLI command
+  remain `agentrails`). `requires-python >= 3.10`.

@@ -33,12 +33,15 @@ because the planner "should" have gotten it right.
 ## Install
 
 ```bash
-pip install -e .          # from a checkout, editable install
-pip install -e ".[dev]"   # + pytest for running the test suite
-pip install -e ".[mcp]"   # + the MCP server dependency (see below)
+pip install kratos-agentrails          # from PyPI
+pip install -e .                       # from a checkout, editable install
+pip install -e ".[dev]"                # + pytest for running the test suite
+pip install -e ".[mcp]"                # + the MCP server dependency (see below)
 ```
 
-Requires Python 3.10+. (Not yet published to PyPI — this is a v0.1 scaffold.)
+Requires Python 3.10+. Published on PyPI as
+[`kratos-agentrails`](https://pypi.org/project/kratos-agentrails/); the
+importable package and CLI command are both still `agentrails`.
 
 ## Quick example (generic core)
 
@@ -192,7 +195,7 @@ of this exact recipe.
 
 Keep the rules in a config file, reviewed like code and diffable, instead of
 buried in Python. JSON works out of the box; YAML needs `pip install
-agentrails[yaml]`, so the library stays dependency-free by default.
+kratos-agentrails[yaml]`, so the library stays dependency-free by default.
 
 ```python
 from agentrails import load_policy, validate_actions
@@ -290,8 +293,8 @@ threshold, concentration, irreversibility, shadow mode), the ledger, the circuit
 breaker, declarative policies (JSON/YAML), the `@guarded` wrapper, the
 `agentrails report` CLI, a reference MCP gateway, and three reference adapters
 (**trading**, **api_spend**, **shell**) are implemented and tested (133 passing
-tests, CI on Python 3.10–3.13). See `SECURITY.md` for the trust boundary. Not yet
-published to PyPI.
+tests, CI on Python 3.10–3.13). See `SECURITY.md` for the trust boundary.
+Published on PyPI as [`kratos-agentrails`](https://pypi.org/project/kratos-agentrails/).
 
 ## About
 
